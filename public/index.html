@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Advanced Website Cloner</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🌐 Advanced Website Cloner</h1>
+      <p>Serverless clone on Vercel — download any site as ZIP</p>
+    </div>
+
+    <div class="content">
+      <form id="cloneForm">
+        <div class="input-group">
+          <label for="url">Website URL</label>
+          <input type="url" id="url" name="url" required placeholder="https://example.com" />
+        </div>
+
+        <div class="options">
+          <h3>⚙️ Options</h3>
+          <div class="checkbox-group">
+            <label><input type="checkbox" id="download_images" checked /> Download Images</label>
+            <label><input type="checkbox" id="download_css" checked /> Download CSS</label>
+            <label><input type="checkbox" id="download_js" checked /> Download JavaScript</label>
+            <label><input type="checkbox" id="follow_links" /> Follow Links</label>
+            <label><input type="checkbox" id="recursive" checked /> Recursive</label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn" id="cloneBtn">🚀 Start Cloning</button>
+      </form>
+
+      <div class="warning">
+        <strong>⚠️ Notes:</strong>
+        <ul>
+          <li>Max 25 pages per clone (Vercel 60s limit).</li>
+          <li>Only clone sites you have permission to copy.</li>
+          <li>Private/local IPs are blocked.</li>
+        </ul>
+      </div>
+
+      <div class="log" id="log" style="display:none"></div>
+      <div class="result" id="result" style="display:none"></div>
+    </div>
+
+    <div class="footer">For educational use only.</div>
+  </div>
+
+  <script>
+    const form = document.getElementById('cloneForm');
+    const btn = document.getElementById('cloneBtn');
+    const logEl = document.getElementById('log');
+    const resultEl = document.getElementById('result');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const url = document.getElementById('url').value.trim();
+      if (!url) return;
+
+      const options = {
+        downloadImages: document.getElementById('download_images').checked,
+        downloadCss: document.getElementById('download_css').checked,
+        downloadJs: document.getElementById('download_js').checked,
+        followLinks: document.getElementById('follow_links').checked,
+        recursive: document.getElementById('recursive').checked,
+      };
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Cloning…';
+      logEl.innerHTML = '';
+      logEl.style.display = 'block';
+      resultEl.style.display = 'none';
+
+      // SSE via fetch + ReadableStream
+      try {
+        const response = await fetch('/api/clone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, options }),
+        });
+
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop(); // keep incomplete part
+
+          for (const chunk of parts) {
+            const line = chunk.split('\n').find((l) => l.startsWith('data: '));
+            if (!line) continue;
+            try {
+              const evt = JSON.parse(line.slice(6));
+              handleEvent(evt);
+            } catch {}
+          }
+        }
+      } catch (err) {
+        addLog('❌ Error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🚀 Start Cloning';
+      }
+    });
+
+    function handleEvent(evt) {
+      if (evt.type === 'log') {
+        addLog(evt.message);
+      } else if (evt.type === 'error') {
+        addLog('❌ ' + evt.message);
+      } else if (evt.type === 'done') {
+        addLog('🎉 ' + evt.message || 'Complete!');
+        showResult(evt);
+      }
+    }
+
+    function addLog(msg) {
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      div.textContent = msg;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function showResult(evt) {
+      const bytes = Uint8Array.from(atob(evt.zipBase64), (c) => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+
+      resultEl.innerHTML = `
+        <h3>✅ Clone Complete</h3>
+        <p>Files: ${evt.files} • Size: ${(evt.size / 1024).toFixed(1)} KB ${evt.truncated ? '• ⚠️ Truncated' : ''}</p>
+        <a class="download-btn" href="${url}" download="${evt.filename}">📥 Download ZIP</a>
+      `;
+      resultEl.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
