@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "functions": {
+    "api/clone.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" }
+  ]
+}
