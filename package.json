@@ -1,16 +1,16 @@
 {
   "name": "website-cloner",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
+  "type": "module",
   "description": "Advanced Website Cloner on Vercel",
   "scripts": {
     "dev": "vercel dev"
   },
   "dependencies": {
-    "cheerio": "^1.0.0",
+    "cheerio": "^1.0.0-rc.12",
     "node-fetch": "^3.3.2",
-    "archiver": "^6.0.1",
-    "mime-types": "^2.1.35"
+    "archiver": "^6.0.1"
   },
   "engines": {
     "node": ">=18"
